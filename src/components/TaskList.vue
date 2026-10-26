@@ -9,7 +9,7 @@ interface Task {
 }
 
 const tasks = ref<Task[]>([
-  { name: 'Erster Task', description: 'Das ist ein Task', done: false },
+  { name: 'Erster Task', description: 'Das ist kein Task', done: false },
   { name: 'Web-Tech-Vorlesung nacharbeiten', description: 'Folien zu Vue wiederholen', done: true },
   { name: 'Backend erweitern', description: 'POST-Endpunkt für neue Tasks', done: false },
 ])
