@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 
 // Entspricht der Klasse Task.java im Backend
 interface Task {
@@ -8,11 +8,16 @@ interface Task {
   done: boolean
 }
 
-const tasks = ref<Task[]>([
-  { name: 'Erster Task', description: 'Das ist kein Task', done: false },
-  { name: 'Web-Tech-Vorlesung nacharbeiten', description: 'Folien zu Vue wiederholen', done: true },
-  { name: 'Backend erweitern', description: 'POST-Endpunkt für neue Tasks', done: false },
-])
+const tasks = ref<Task[]>([])
+
+onMounted(async () => {
+  // 1. Anfrage an das Backend schicken
+  const response = await fetch(`${import.meta.env.VITE_BACKEND_BASE_URL}/todos`)
+  // 2. JSON aus der Response holen
+  const data: Task[] = await response.json()
+  // 3. Ergebnis in tasks speichern
+  tasks.value = data
+})
 </script>
 
 <template>
