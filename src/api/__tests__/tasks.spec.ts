@@ -6,12 +6,12 @@ function jsonResponse(status: number, body: unknown): Response {
 }
 
 describe('tasks api', () => {
-  let fetchMock: ReturnType<typeof vi.fn>
+  let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>
   const input = { name: 'Neu', description: 'd', done: false }
 
   beforeEach(() => {
     vi.stubEnv('VITE_BACKEND_BASE_URL', 'http://api.test')
-    fetchMock = vi.fn()
+    fetchMock = vi.fn<typeof fetch>()
     vi.stubGlobal('fetch', fetchMock)
   })
 

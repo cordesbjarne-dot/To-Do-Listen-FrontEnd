@@ -6,7 +6,12 @@ import { ApiError, fetchTasks, updateTask } from '@/api/tasks'
 
 vi.mock('@/api/tasks', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/tasks')>()
-  return { ...actual, fetchTasks: vi.fn(), createTask: vi.fn(), updateTask: vi.fn() }
+  return {
+    ...actual,
+    fetchTasks: vi.fn<typeof actual.fetchTasks>(),
+    createTask: vi.fn<typeof actual.createTask>(),
+    updateTask: vi.fn<typeof actual.updateTask>(),
+  }
 })
 
 const a = { id: 1, name: 'A', description: null, done: false }
@@ -29,7 +34,9 @@ describe('TaskList', () => {
     expect(items).toHaveLength(2)
     expect(items[0]!.text()).toContain('A')
     expect(items[1]!.text()).toContain('B')
-    expect((items[0]!.get('input[type="checkbox"]').element as HTMLInputElement).checked).toBe(false)
+    expect((items[0]!.get('input[type="checkbox"]').element as HTMLInputElement).checked).toBe(
+      false,
+    )
     expect((items[1]!.get('input[type="checkbox"]').element as HTMLInputElement).checked).toBe(true)
     expect(items[0]!.classes()).not.toContain('done')
     expect(items[1]!.classes()).toContain('done')

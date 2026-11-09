@@ -6,12 +6,21 @@ import { ApiError, createTask, updateTask } from '@/api/tasks'
 
 vi.mock('@/api/tasks', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/tasks')>()
-  return { ...actual, createTask: vi.fn(), updateTask: vi.fn() }
+  return {
+    ...actual,
+    createTask: vi.fn<typeof actual.createTask>(),
+    updateTask: vi.fn<typeof actual.updateTask>(),
+  }
 })
 
 const editTask = { id: 3, name: 'Lernen', description: 'Kap 3', done: true }
 
-function mountForm(task: typeof editTask | { id: number; name: string; description: string | null; done: boolean } | null) {
+function mountForm(
+  task:
+    | typeof editTask
+    | { id: number; name: string; description: string | null; done: boolean }
+    | null,
+) {
   return mount(TaskForm, { props: { task } })
 }
 
@@ -76,7 +85,11 @@ describe('TaskForm', () => {
     await wrapper.get('#task-name').setValue('Lernen 2')
     await wrapper.get('form').trigger('submit')
     await flushPromises()
-    expect(updateTask).toHaveBeenCalledWith(3, { name: 'Lernen 2', description: 'Kap 3', done: true })
+    expect(updateTask).toHaveBeenCalledWith(3, {
+      name: 'Lernen 2',
+      description: 'Kap 3',
+      done: true,
+    })
     expect(wrapper.emitted('saved')![0]).toEqual([updated])
     expect(createTask).not.toHaveBeenCalled()
   })
