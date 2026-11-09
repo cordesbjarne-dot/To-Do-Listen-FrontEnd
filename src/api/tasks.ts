@@ -1,78 +1,103 @@
-// API-Modul für alle Aufrufe ans Backend (Tasks laden, erstellen, ändern).
-// Hier liegen auch die Typen und die einheitliche Fehlerbehandlung.
+// Alle Aufrufe ans Backend an einer Stelle. Komponenten importieren nur diese Funktionen
+// und müssen weder URLs noch HTTP-Details kennen.
+import type { Task, TaskInput, TaskStatus } from '@/types/task'
 
-// Entspricht der Klasse Task.java im Backend
-export interface Task {
-  id: number
-  name: string
-  description: string | null
-  done: boolean
+/** Ein Feldfehler aus der Backend-Antwort, z. B. { field: 'title', message: '…' } */
+export interface FieldError {
+  field: string
+  message: string
 }
 
-// Daten, die wir beim Erstellen/Bearbeiten an das Backend schicken (ohne id)
-export interface TaskInput {
-  name: string
-  description: string
-  done: boolean
-}
-
-// Fehler, den alle Funktionen dieses Moduls werfen.
-// status = HTTP-Statuscode, 0 bedeutet: Backend war gar nicht erreichbar.
+/**
+ * Fehler, den alle Funktionen dieses Moduls werfen.
+ * status 0 bedeutet: Backend nicht erreichbar (Netzwerkfehler).
+ */
 export class ApiError extends Error {
-  status: number
-  constructor(status: number, message: string) {
+  readonly status: number
+  readonly fieldErrors: FieldError[]
+
+  constructor(status: number, message: string, fieldErrors: FieldError[] = []) {
     super(message)
+    this.name = 'ApiError'
     this.status = status
+    this.fieldErrors = fieldErrors
   }
 }
 
-// Baut die volle URL, z. B. http://localhost:8080/todos.
-// Die Env-Variable wird bei jedem Aufruf neu gelesen, damit Tests sie ändern können.
+// Adresse aus der Umgebungsvariable VITE_BACKEND_BASE_URL (.env.development bzw. Render).
+// Wird bei jedem Aufruf gelesen, damit Tests sie per vi.stubEnv ändern können.
 function url(path: string): string {
-  return `${import.meta.env.VITE_BACKEND_BASE_URL}${path}`
+  const base = (import.meta.env.VITE_BACKEND_BASE_URL ?? '').replace(/\/$/, '')
+  return `${base}${path}`
 }
 
-// Übersetzt einen HTTP-Statuscode in einen lesbaren deutschen Text.
-function messageFor(status: number): string {
-  if (status === 400) return 'Ungültige Eingabe: Der Name darf nicht leer sein.'
-  if (status === 404) return 'Task wurde nicht gefunden.'
-  return `Serverfehler (Status ${status}).`
+function fallbackMessage(status: number): string {
+  if (status === 400) return 'Die Eingaben sind ungültig.'
+  if (status === 404)
+    return 'Die Aufgabe wurde nicht gefunden. Vielleicht wurde sie bereits gelöscht.'
+  if (status >= 500) return 'Der Server hat einen Fehler gemeldet. Bitte versuche es später erneut.'
+  return `Die Anfrage ist fehlgeschlagen (Status ${status}).`
 }
 
-// Schickt eine Anfrage ans Backend und gibt das JSON zurück.
-// Wirft einen ApiError, wenn die Anfrage fehlschlägt (Netzwerk oder HTTP-Fehler).
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+// Liest die Fehlerantwort des Backends (Problem Details: detail + errors).
+async function toApiError(response: Response): Promise<ApiError> {
+  try {
+    const body = (await response.json()) as { detail?: unknown; errors?: unknown }
+    const fieldErrors = Array.isArray(body.errors) ? (body.errors as FieldError[]) : []
+    // Bei 5xx zeigen wir bewusst keinen Servertext an
+    const message =
+      response.status < 500 && typeof body.detail === 'string'
+        ? body.detail
+        : fallbackMessage(response.status)
+    return new ApiError(response.status, message, fieldErrors)
+  } catch {
+    return new ApiError(response.status, fallbackMessage(response.status))
+  }
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   let response: Response
   try {
-    // Ohne init nur die URL übergeben, mit init die URL und die Optionen (Methode, Body).
-    response = init ? await fetch(url(path), init) : await fetch(url(path))
+    response = await fetch(url(path), {
+      ...init,
+      headers: init.body ? { 'Content-Type': 'application/json' } : undefined,
+    })
   } catch {
-    // fetch wirft nur, wenn gar keine Verbindung zustande kommt (z. B. Backend aus).
-    throw new ApiError(0, 'Backend nicht erreichbar. Bitte später erneut versuchen.')
+    throw new ApiError(
+      0,
+      'Der Server ist nicht erreichbar. Prüfe deine Verbindung oder versuche es gleich noch einmal.',
+    )
   }
-  // fetch wirft bei 400/404/500 NICHT, deshalb prüfen wir response.ok selbst.
   if (!response.ok) {
-    throw new ApiError(response.status, messageFor(response.status))
+    throw await toApiError(response)
   }
-  return (await response.json()) as T
+  // 204 No Content (Löschen) hat keinen Body
+  return (response.status === 204 ? undefined : await response.json()) as T
 }
 
-// Baut die Optionen für eine Anfrage mit JSON-Body (POST oder PUT).
-function jsonInit(method: 'POST' | 'PUT', input: TaskInput): RequestInit {
-  return { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }
-}
-
-// Lädt alle Tasks (GET /todos).
 export function fetchTasks(): Promise<Task[]> {
   return request<Task[]>('/todos')
 }
 
-// Erstellt einen neuen Task (POST /todos). Das Backend antwortet mit 201 und dem Task inkl. id.
 export function createTask(input: TaskInput): Promise<Task> {
-  return request<Task>('/todos', jsonInit('POST', input))
+  return request<Task>('/todos', { method: 'POST', body: JSON.stringify(input) })
 }
 
-// Ändert einen bestehenden Task (PUT /todos/{id}). Die id steht im Pfad, nicht im Body.
 export function updateTask(id: number, input: TaskInput): Promise<Task> {
-  return request<Task>(`/todos/${id}`, jsonInit('PUT', input))
+  return request<Task>(`/todos/${id}`, { method: 'PUT', body: JSON.stringify(input) })
+}
+
+export function setTaskStatus(id: number, status: TaskStatus): Promise<Task> {
+  return request<Task>(`/todos/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) })
+}
+
+export function deleteTask(id: number): Promise<void> {
+  return request<void>(`/todos/${id}`, { method: 'DELETE' })
+}
+
+/** Macht aus einem beliebigen Fehler einen anzeigbaren deutschen Text. */
+export function errorMessage(error: unknown): string {
+  return error instanceof ApiError
+    ? error.message
+    : 'Unerwarteter Fehler. Bitte lade die Seite neu.'
 }

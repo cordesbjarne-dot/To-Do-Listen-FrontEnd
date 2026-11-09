@@ -7,8 +7,11 @@ export default mergeConfig(
   defineConfig({
     test: {
       environment: 'jsdom',
+      // e2e/ enthält Playwright-Tests, die gegen die laufende Anwendung laufen
       exclude: [...configDefaults.exclude, 'e2e/**'],
       root: fileURLToPath(new URL('./', import.meta.url)),
+      setupFiles: ['./src/test/setup.ts'],
+      restoreMocks: true,
     },
   }),
 )

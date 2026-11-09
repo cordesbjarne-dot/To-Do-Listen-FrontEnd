@@ -1,99 +1,96 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { ApiError, createTask, fetchTasks, updateTask } from '../tasks'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  ApiError,
+  createTask,
+  deleteTask,
+  fetchTasks,
+  setTaskStatus,
+  updateTask,
+} from '@/api/tasks'
+import { jsonResponse, makeTask } from '@/test/fixtures'
 
-function jsonResponse(status: number, body: unknown): Response {
-  return { ok: status >= 200 && status < 300, status, json: async () => body } as Response
-}
-
-describe('tasks api', () => {
-  let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>
-  const input = { name: 'Neu', description: 'd', done: false }
-
+describe('API-Modul', () => {
   beforeEach(() => {
-    vi.stubEnv('VITE_BACKEND_BASE_URL', 'http://api.test')
-    fetchMock = vi.fn<typeof fetch>()
-    vi.stubGlobal('fetch', fetchMock)
+    vi.stubEnv('VITE_BACKEND_BASE_URL', 'http://api.test/')
   })
-
   afterEach(() => {
     vi.unstubAllEnvs()
-    vi.unstubAllGlobals()
   })
 
-  it('fetchTasks_callsGetTodos_returnsList', async () => {
-    const list = [{ id: 1, name: 'A', description: null, done: false }]
-    fetchMock.mockResolvedValue(jsonResponse(200, list))
-
-    const result = await fetchTasks()
-
-    expect(result).toEqual(list)
-    expect(fetchMock).toHaveBeenCalledWith('http://api.test/todos')
+  it('nutzt die konfigurierte Backend-Adresse', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse([makeTask()]))
+    const tasks = await fetchTasks()
+    expect(tasks).toHaveLength(1)
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe('http://api.test/todos')
   })
 
-  it('createTask_postsJson', async () => {
-    fetchMock.mockResolvedValue(jsonResponse(201, { id: 5, ...input }))
+  it('schickt die richtigen Methoden und JSON-Bodies', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => jsonResponse(makeTask()))
+    const input = {
+      title: 'T',
+      description: null,
+      priority: 'HIGH' as const,
+      dueDate: '2026-11-20',
+    }
 
-    const result = await createTask(input)
+    await createTask(input)
+    await updateTask(7, input)
+    await setTaskStatus(7, 'DONE')
 
-    expect(result.id).toBe(5)
-    expect(fetchMock).toHaveBeenCalledWith('http://api.test/todos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
+    const calls = fetchSpy.mock.calls.map(([url, init]) => [url, init?.method, init?.body])
+    expect(calls).toEqual([
+      ['http://api.test/todos', 'POST', JSON.stringify(input)],
+      ['http://api.test/todos/7', 'PUT', JSON.stringify(input)],
+      ['http://api.test/todos/7/status', 'PATCH', JSON.stringify({ status: 'DONE' })],
+    ])
+  })
+
+  it('akzeptiert 204 ohne Body beim Löschen', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(null, 204))
+    await expect(deleteTask(3)).resolves.toBeUndefined()
+    expect(fetchSpy.mock.calls[0]?.[1]?.method).toBe('DELETE')
+  })
+
+  it('übernimmt Fehlertext und Feldfehler aus der Problem-Details-Antwort', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(
+        {
+          status: 400,
+          detail: 'Die Eingaben sind ungültig.',
+          errors: [{ field: 'title', message: 'Zu lang' }],
+        },
+        400,
+      ),
+    )
+    const error = await createTask({
+      title: 'x',
+      description: null,
+      priority: 'LOW',
+      dueDate: null,
+    }).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(ApiError)
+    expect((error as ApiError).status).toBe(400)
+    expect((error as ApiError).message).toBe('Die Eingaben sind ungültig.')
+    expect((error as ApiError).fieldErrors).toEqual([{ field: 'title', message: 'Zu lang' }])
+  })
+
+  it('meldet Netzwerkfehler verständlich mit Status 0', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'))
+    await expect(fetchTasks()).rejects.toMatchObject({
+      status: 0,
+      message: expect.stringContaining('nicht erreichbar'),
     })
   })
 
-  it('updateTask_putsJson', async () => {
-    fetchMock.mockResolvedValue(jsonResponse(200, { id: 5, ...input }))
-
-    await updateTask(5, input)
-
-    expect(fetchMock).toHaveBeenCalledWith('http://api.test/todos/5', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
-    })
-  })
-
-  it('error400_throwsApiError', async () => {
-    fetchMock.mockResolvedValue(jsonResponse(400, {}))
-
-    const promise = createTask(input)
-
-    await expect(promise).rejects.toBeInstanceOf(ApiError)
-    await expect(promise).rejects.toMatchObject({
-      status: 400,
-      message: 'Ungültige Eingabe: Der Name darf nicht leer sein.',
-    })
-  })
-
-  it('error404_throwsApiError', async () => {
-    fetchMock.mockResolvedValue(jsonResponse(404, {}))
-
-    await expect(updateTask(99, input)).rejects.toMatchObject({
-      status: 404,
-      message: 'Task wurde nicht gefunden.',
-    })
-  })
-
-  it('error500_throwsApiError', async () => {
-    fetchMock.mockResolvedValue(jsonResponse(500, {}))
-
+  it('zeigt bei Serverfehlern keinen internen Text', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ detail: 'NullPointerException in X' }, 500),
+    )
     await expect(fetchTasks()).rejects.toMatchObject({
       status: 500,
-      message: 'Serverfehler (Status 500).',
-    })
-  })
-
-  it('networkError_throwsApiErrorWithStatus0', async () => {
-    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
-
-    const promise = fetchTasks()
-
-    await expect(promise).rejects.toBeInstanceOf(ApiError)
-    await expect(promise).rejects.toMatchObject({
-      status: 0,
-      message: 'Backend nicht erreichbar. Bitte später erneut versuchen.',
+      message: expect.stringContaining('Server'),
     })
   })
 })

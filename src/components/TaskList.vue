@@ -1,112 +1,109 @@
 <script setup lang="ts">
-// Liste aller Tasks. Lädt die Tasks beim Start, speichert das Abhaken (done) per PUT
-// und bindet das Formular TaskForm ein, mit dem man Tasks bearbeitet oder neu anlegt.
-import { ref, onMounted } from 'vue'
-import TaskForm from './TaskForm.vue'
-import { ApiError, fetchTasks, updateTask } from '@/api/tasks'
-import type { Task } from '@/api/tasks'
+// Liste der (bereits gefilterten und sortierten) Aufgaben inklusive der beiden Leerzustände:
+// 1. Es gibt überhaupt keine Aufgaben  2. Suche/Filter liefern keine Treffer.
+import TaskItem from './TaskItem.vue'
+import type { Task } from '@/types/task'
 
-// Alle Tasks, die gerade in der Liste stehen
-const tasks = ref<Task[]>([])
-// Fehlertext für die Anzeige über der Liste (leer = kein Fehler)
-const error = ref('')
-// Der Task, der gerade im Formular bearbeitet wird. null = Formular im Modus "Neuer Task".
-const editingTask = ref<Task | null>(null)
+defineProps<{
+  tasks: Task[]
+  totalCount: number
+  today: string
+  busyIds: ReadonlySet<number>
+}>()
 
-// Macht aus einem Fehler einen lesbaren Text. ApiError enthält schon einen deutschen Text.
-function toMessage(e: unknown): string {
-  return e instanceof ApiError ? e.message : 'Unbekannter Fehler.'
-}
-
-// Lädt alle Tasks vom Backend neu. Bei Fehler erscheint die Meldung über der Liste.
-async function loadTasks() {
-  try {
-    tasks.value = await fetchTasks()
-    error.value = ''
-  } catch (e) {
-    error.value = toMessage(e)
-  }
-}
-
-// Läuft, wenn die Checkbox eines Tasks geklickt wird. Speichert den neuen done-Wert per PUT.
-// Schlägt das Speichern fehl, springt die Checkbox auf den alten Wert zurück.
-async function onToggle(task: Task, event: Event) {
-  // Die Checkbox, die das Event ausgelöst hat. Daran lesen wir den neuen Haken-Zustand ab.
-  const checkbox = event.target as HTMLInputElement
-  try {
-    const updated = await updateTask(task.id, {
-      name: task.name,
-      // description kann im Backend null sein, PUT erwartet aber einen Text
-      description: task.description ?? '',
-      done: checkbox.checked,
-    })
-    // Den alten Task durch die Antwort des Backends ersetzen (über die id gefunden)
-    tasks.value = tasks.value.map((t) => (t.id === updated.id ? updated : t))
-    error.value = ''
-  } catch (e) {
-    // Haken zurücksetzen, weil die Änderung nicht gespeichert wurde
-    checkbox.checked = task.done
-    error.value = toMessage(e)
-  }
-}
-
-// Öffnet das Formular im Bearbeiten-Modus mit diesem Task
-function editTask(task: Task) {
-  editingTask.value = task
-}
-
-// Läuft, wenn das Formular erfolgreich gespeichert hat. Schließt den Bearbeiten-Modus
-// und lädt die Liste neu, damit die neuen Werte sichtbar sind.
-async function onSaved() {
-  editingTask.value = null
-  await loadTasks()
-}
-
-// Beim Einbau der Komponente die Tasks laden
-onMounted(loadTasks)
+const emit = defineEmits<{
+  toggle: [task: Task]
+  edit: [task: Task]
+  delete: [task: Task]
+  create: []
+  resetFilters: []
+}>()
 </script>
 
 <template>
-  <section>
-    <h2>Meine Tasks</h2>
-    <!-- Fehlermeldung, z. B. wenn das Backend nicht erreichbar ist -->
-    <p v-if="error" class="list-error" role="alert">{{ error }}</p>
-    <!-- :task bestimmt den Modus des Formulars: ohne Task "Neuer Task", mit Task "Bearbeiten" -->
-    <TaskForm :task="editingTask" @saved="onSaved" @cancel="editingTask = null" />
-    <ul>
-      <li v-for="task in tasks" :key="task.id" :class="{ done: task.done }">
-        <!-- :checked zeigt den gespeicherten Wert, @change speichert eine Änderung per PUT -->
-        <input type="checkbox" :checked="task.done" @change="onToggle(task, $event)" />
-        <strong>{{ task.name }}</strong>
-        <button type="button" class="edit" @click="editTask(task)">Bearbeiten</button>
-        <p class="description">{{ task.description }}</p>
-      </li>
-    </ul>
-  </section>
+  <div v-if="totalCount === 0" class="empty" data-testid="empty-state">
+    <svg viewBox="0 0 48 48" width="48" height="48" aria-hidden="true" class="empty__icon">
+      <rect
+        x="8"
+        y="6"
+        width="32"
+        height="38"
+        rx="4"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.5"
+      />
+      <path
+        d="M16 18h16M16 26h16M16 34h9"
+        stroke="currentColor"
+        stroke-width="2.5"
+        stroke-linecap="round"
+      />
+    </svg>
+    <h3>Noch keine Aufgaben</h3>
+    <p>Lege deine erste Aufgabe an, zum Beispiel eine Abgabe oder ein Lernziel für diese Woche.</p>
+    <button type="button" class="button button--primary" @click="emit('create')">
+      Erste Aufgabe anlegen
+    </button>
+  </div>
+
+  <div v-else-if="tasks.length === 0" class="empty" data-testid="no-results">
+    <h3>Keine passenden Aufgaben</h3>
+    <p>
+      Für deine Suche und Filter gibt es keine Treffer. Passe die Auswahl an oder setze sie zurück.
+    </p>
+    <button type="button" class="button button--secondary" @click="emit('resetFilters')">
+      Filter zurücksetzen
+    </button>
+  </div>
+
+  <ul v-else class="task-list">
+    <TaskItem
+      v-for="task in tasks"
+      :key="task.id"
+      :task="task"
+      :today="today"
+      :busy="busyIds.has(task.id)"
+      @toggle="emit('toggle', $event)"
+      @edit="emit('edit', $event)"
+      @delete="emit('delete', $event)"
+    />
+  </ul>
 </template>
 
 <style scoped>
-ul {
-  list-style: none;
+.task-list {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
   padding: 0;
+  list-style: none;
 }
 
-li {
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--color-border);
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  padding: 2.5rem 1.25rem;
+  text-align: center;
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
 }
 
-p {
-  margin: 0.25rem 0 0 1.5rem;
-  font-size: 0.9rem;
+.empty__icon {
+  color: var(--color-accent);
 }
 
-.done {
-  text-decoration: line-through;
-  opacity: 0.6;
+.empty h3 {
+  margin: 0.25rem 0 0;
+  font-size: 1.1rem;
 }
 
-.list-error {
-  color: red;
+.empty p {
+  margin: 0 0 0.5rem;
+  max-width: 42ch;
+  color: var(--color-muted);
+  line-height: 1.5;
 }
 </style>
