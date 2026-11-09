@@ -86,7 +86,7 @@ jobs:
           JDBC_DATABASE_URL: jdbc:postgresql://localhost:5432/tasklist_e2e
           JDBC_DATABASE_USERNAME: e2e
           JDBC_DATABASE_PASSWORD: e2e-only
-          CORS_ALLOWED_ORIGINS: http://localhost:4173
+          FRONTEND_URL: http://localhost:4173
         run: |
           ./gradlew bootJar --no-daemon
           nohup java -jar build/libs/*.jar > ../backend.log 2>&1 &
