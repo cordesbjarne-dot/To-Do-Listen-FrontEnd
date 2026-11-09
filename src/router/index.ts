@@ -2,7 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import TasksView from '../views/TasksView.vue'
 
 // History-Modus: saubere URLs ohne "#". Damit ein Direktaufruf (z. B. /irgendwas) auf Render
-// funktioniert, leitet eine Rewrite-Regel alle Pfade auf index.html um (siehe render.yaml).
+// funktioniert, leitet auf Render eine Rewrite-Regel /* -> /index.html alle Pfade um (siehe docs/DEPLOYMENT.md).
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [

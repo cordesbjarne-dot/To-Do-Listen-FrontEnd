@@ -1,54 +1,45 @@
-# To-Do-Listen-FrontEnd
+# Studienaufgaben – Frontend
 
-This template should help get you started developing with Vue 3 in Vite.
+Vue-3-/TypeScript-Oberfläche der Aufgabenverwaltung für Studierende (WebTech-Kurs).
+Gesamtdokumentation, Architektur und Bewertungsmatrix liegen im Projektordner (`README.md`, `docs/`).
 
-## Recommended IDE Setup
+## Start
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+Voraussetzungen: Node.js 24 (oder ≥ 22.18), laufendes Backend.
 
-## Recommended Browser Setup
-
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
-
-## Type Support for `.vue` Imports in TS
-
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
-
-```sh
-npm install
-```
-
-### Compile and Hot-Reload for Development
-
-```sh
+```bash
+npm ci
 npm run dev
 ```
 
-### Type-Check, Compile and Minify for Production
+Die Backend-Adresse kommt aus `VITE_BACKEND_BASE_URL` (`.env.development`, Vorlage `.env.example`).
 
-```sh
-npm run build
-```
+## Skripte
 
-### Run Unit Tests with [Vitest](https://vitest.dev/)
+| Befehl                 | Zweck                                                 |
+|------------------------|-------------------------------------------------------|
+| `npm run dev`          | Entwicklungsserver (Port 5173)                        |
+| `npm run build`        | Typprüfung + Produktionsbuild nach `dist/`            |
+| `npm run type-check`   | vue-tsc                                               |
+| `npm run lint`         | oxlint + ESLint, nur prüfen                           |
+| `npm run lint:fix`     | automatische Korrekturen                              |
+| `npm run format:check` | Prettier prüfen (`npm run format` schreibt)           |
+| `npm test`             | Vitest einmalig (`npm run test:unit` im Watch-Modus)  |
+| `npm run test:e2e`     | Playwright-Hauptablauf gegen ein laufendes Backend    |
 
-```sh
-npm run test:unit
-```
+Für E2E einmalig `npx playwright install chromium`. Ohne `E2E_BASE_URL` baut Playwright das
+Frontend selbst und startet `vite preview` auf Port 4173; das Backend muss unter
+`VITE_BACKEND_BASE_URL` laufen und `http://localhost:4173` per CORS erlauben (Standard).
 
-### Lint with [ESLint](https://eslint.org/)
+## Aufbau
 
-```sh
-npm run lint
-```
+- `src/api/tasks.ts` – alle HTTP-Aufrufe, `ApiError`
+- `src/composables/useTasks.ts` – Listenzustand, Schutz vor verspäteten Antworten/Doppelanfragen
+- `src/utils/taskView.ts` – Suche, Filter, Sortierung, Kennzahlen, „überfällig“
+- `src/views/TasksView.vue` – Hauptseite
+- `src/components/*` – Kennzahlen, Filterleiste, Liste, Formular- und Löschdialog, Meldungen
+
+## Deployment (Render Static Site)
+
+Build `npm ci && npm run build`, Publish-Verzeichnis `dist`, Variable `VITE_BACKEND_BASE_URL`,
+Rewrite-Regel `/*` → `/index.html`. CI: `.github/workflows/ci.yml`.

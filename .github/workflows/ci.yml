@@ -1,0 +1,117 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [main, 'feature/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Typprüfung, Lint, Unit-Tests, Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      # npm ci installiert exakt die Versionen aus package-lock.json
+      - run: npm ci
+      - name: TypeScript-Prüfung
+        run: npm run type-check
+      - name: Lint (ohne automatische Korrekturen)
+        run: npm run lint
+      - name: Formatierung prüfen
+        run: npm run format:check
+      - name: Unit- und Komponententests
+        run: npm test
+      - name: Produktionsbuild
+        run: npm run build-only
+        env:
+          VITE_BACKEND_BASE_URL: https://backend.example.invalid
+
+  e2e:
+    name: End-to-End (Frontend + Backend + PostgreSQL)
+    runs-on: ubuntu-latest
+    needs: checks
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          # Wegwerf-Datenbank nur für diesen CI-Lauf, kein echtes Secret
+          POSTGRES_DB: tasklist_e2e
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d tasklist_e2e"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # Backend aus dem separaten Repository. Branch über die Repository-Variable
+      # BACKEND_REF wählbar (Standard: main).
+      - uses: actions/checkout@v4
+        with:
+          repository: JonasGrdl/todo-list-backend
+          ref: ${{ vars.BACKEND_REF || 'main' }}
+          path: backend
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Backend bauen und starten
+        working-directory: backend
+        env:
+          JDBC_DATABASE_URL: jdbc:postgresql://localhost:5432/tasklist_e2e
+          JDBC_DATABASE_USERNAME: e2e
+          JDBC_DATABASE_PASSWORD: e2e-only
+          CORS_ALLOWED_ORIGINS: http://localhost:4173
+        run: |
+          ./gradlew bootJar --no-daemon
+          nohup java -jar build/libs/*.jar > ../backend.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:8080/actuator/health && exit 0
+            sleep 2
+          done
+          echo "Backend ist nicht gestartet" && cat ../backend.log && exit 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      # Playwright baut das Frontend und startet "vite preview" auf Port 4173
+      - name: E2E-Hauptablauf
+        run: npm run test:e2e
+        env:
+          CI: 'true'
+          VITE_BACKEND_BASE_URL: http://localhost:8080
+
+      - name: Berichte hochladen
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            playwright-report
+            test-results
+            backend.log
