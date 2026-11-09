@@ -1,0 +1,52 @@
+name: Frontend prüfen
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: studium
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ['55439:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '26', cache: npm}
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test:unit
+      - run: npm run build
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          repository: JonasGrdl/todo-list-backend
+          ref: ${{ vars.BACKEND_REF || 'a5c7f44c8f53fc4fd947dea88f51c9cffdd8e7be' }}
+          path: test-backend
+          token: ${{ secrets.BACKEND_READ_TOKEN || github.token }}
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '25'}
+      - name: Testbackend starten
+        working-directory: test-backend
+        env:
+          JDBC_DATABASE_URL: jdbc:postgresql://127.0.0.1:55439/postgres
+          JDBC_DATABASE_USERNAME: studium
+          JDBC_DATABASE_PASSWORD: ''
+          PORT: '18080'
+          FRONTEND_URL: http://localhost:15173
+        run: |
+          bash gradlew bootJar
+          java -jar build/libs/*-SNAPSHOT.jar > "$RUNNER_TEMP/backend.log" 2>&1 &
+          for attempt in {1..45}; do
+            if curl -fsS http://localhost:18080/todos; then exit 0; fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/backend.log"
+          exit 1
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: use-case-screenshots, path: docs/screenshots}

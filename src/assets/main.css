@@ -1,35 +1,215 @@
-@import './base.css';
-
-#app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  font-weight: normal;
+:root {
+  font-family: Inter, system-ui, sans-serif;
+  color: #183631;
+  background: #f3f6f2;
+  line-height: 1.5;
+  font-synthesis: none;
 }
-
-a,
-.green {
-  text-decoration: none;
-  color: hsla(160, 100%, 37%, 1);
-  transition: 0.4s;
-  padding: 3px;
+* {
+  box-sizing: border-box;
 }
-
-@media (hover: hover) {
-  a:hover {
-    background-color: hsla(160, 100%, 37%, 0.2);
+body {
+  margin: 0;
+  border-top: 5px solid #226653;
+}
+main {
+  width: min(1050px, 100%);
+  padding: clamp(18px, 4vw, 52px);
+  margin: auto;
+}
+header,
+.itemhead,
+footer,
+.meta,
+.actions,
+.pair {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+header,
+.itemhead {
+  justify-content: space-between;
+}
+header {
+  margin: 12px 0 30px;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+h1 {
+  font-size: clamp(2rem, 5vw, 3.3rem);
+  letter-spacing: -0.055em;
+}
+header p,
+.hits,
+.meta {
+  color: #496059;
+}
+h2 {
+  font-size: 1.45rem;
+}
+h3 {
+  font-size: 1.1rem;
+}
+.metrics,
+.tools {
+  display: grid;
+  gap: 12px;
+}
+.metrics {
+  grid-template-columns: repeat(4, 1fr);
+  margin-bottom: 24px;
+}
+.metrics div,
+.board,
+dialog {
+  background: white;
+  border: 1px solid #cfdbd5;
+  border-radius: 14px;
+}
+.metrics div {
+  padding: 16px;
+}
+.metrics strong {
+  display: block;
+  font-size: 2rem;
+}
+.metrics span {
+  font-size: 0.85rem;
+}
+.board,
+dialog {
+  padding: clamp(16px, 3vw, 30px);
+}
+.tools {
+  grid-template-columns: 2fr repeat(3, 1fr);
+  margin: 20px 0;
+}
+label {
+  display: grid;
+  gap: 5px;
+  font-weight: 600;
+  font-size: 0.86rem;
+}
+input,
+select,
+textarea,
+button {
+  font: inherit;
+  color: inherit;
+  background: white;
+  border: 1px solid #bccdc4;
+  border-radius: 7px;
+  padding: 9px 12px;
+}
+input,
+select,
+textarea {
+  width: 100%;
+  min-width: 0;
+}
+button {
+  cursor: pointer;
+  font-weight: 600;
+}
+button:hover {
+  background: #edf4ee;
+}
+.primary,
+.primary:hover {
+  background: #175c49;
+  color: white;
+}
+.danger,
+.danger:hover {
+  background: #933f37;
+  color: white;
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+:focus-visible {
+  outline: 3px solid #158364;
+  outline-offset: 2px;
+}
+article {
+  border-top: 1px solid #dfe7e1;
+  padding: 18px 0;
+  overflow-wrap: anywhere;
+}
+.description {
+  white-space: pre-wrap;
+  margin: 7px 0;
+}
+.pill,
+.meta b {
+  border-radius: 20px;
+  background: #edf3ed;
+  padding: 3px 10px;
+  font-size: 0.82rem;
+}
+.hoch,
+.late {
+  color: #904222;
+}
+.meta,
+.actions {
+  margin-top: 10px;
+}
+.actions button {
+  font-size: 0.84rem;
+}
+.hits,
+[role='status'] {
+  font-size: 0.9rem;
+  color: #23644f;
+}
+.hits {
+  margin-bottom: 10px;
+}
+[role='alert'] {
+  color: #913d32;
+  margin: 10px 0;
+}
+dialog {
+  width: min(480px, 92vw);
+  max-height: 90vh;
+  overflow: auto;
+  color: inherit;
+  overflow-wrap: anywhere;
+}
+dialog::backdrop {
+  background: #102c2370;
+}
+fieldset {
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+fieldset label {
+  margin-top: 12px;
+}
+.pair > * {
+  flex: 1;
+}
+footer {
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+@media (max-width: 700px) {
+  .metrics,
+  .tools {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-
-@media (min-width: 1024px) {
-  body {
-    display: flex;
-    place-items: center;
-  }
-
-  #app {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    padding: 0 2rem;
+@media (max-width: 400px) {
+  .tools {
+    grid-template-columns: 1fr;
   }
 }
