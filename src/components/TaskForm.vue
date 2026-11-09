@@ -90,12 +90,12 @@ async function submit() {
 
     <div>
       <label for="task-name">Name</label>
-      <input id="task-name" type="text" v-model="name" />
+      <input id="task-name" type="text" v-model="name" maxlength="255" />
     </div>
 
     <div>
       <label for="task-description">Beschreibung</label>
-      <textarea id="task-description" v-model="description"></textarea>
+      <textarea id="task-description" v-model="description" maxlength="255"></textarea>
     </div>
 
     <div>
