@@ -61,6 +61,8 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       # Backend aus dem separaten Repository. Branch über die Repository-Variable
       # BACKEND_REF wählbar (Standard: main).
@@ -69,6 +71,8 @@ jobs:
           repository: JonasGrdl/todo-list-backend
           ref: ${{ vars.BACKEND_REF || 'main' }}
           path: backend
+          # Token nicht in .git/config ablegen, damit der fremde Build es nicht lesen kann
+          persist-credentials: false
 
       - uses: actions/setup-java@v4
         with:
