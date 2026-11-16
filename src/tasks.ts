@@ -1,3 +1,4 @@
+import { request } from './http'
 export const priorities = ['niedrig', 'mittel', 'hoch'] as const
 export type Priority = (typeof priorities)[number]
 export type Status = 'offen' | 'erledigt'
@@ -20,34 +21,11 @@ export const blank = (): Draft => ({
   status: 'offen',
   dueDate: null,
 })
-const endpoint =
-  (import.meta.env.VITE_BACKEND_BASE_URL || 'http://localhost:8080').replace(/\/$/, '') + '/todos'
-async function request<T>(method: string, id?: number, data?: Draft): Promise<T> {
-  const response = await fetch(endpoint + (id == null ? '' : '/' + id), {
-    method,
-    ...(data && {
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: data.name,
-        description: data.description,
-        status: data.status,
-        priority: data.priority,
-        dueDate: data.dueDate,
-      }),
-    }),
-  }).catch(() => {
-    throw new Error('Verbindung fehlgeschlagen. Bitte versuche es erneut.')
-  })
-  if (!response.ok)
-    throw new Error(
-      (await response.json().catch(() => ({}))).message || 'Die Anfrage ist fehlgeschlagen.',
-    )
-  return response.status === 204 ? (undefined as T) : response.json()
-}
 export const api = {
-  list: () => request<Task[]>('GET'),
-  save: (data: Draft, id?: number) => request<Task>(id == null ? 'POST' : 'PUT', id, data),
-  remove: (id: number) => request<void>('DELETE', id),
+  list: () => request<Task[]>('/todos'),
+  save: (data: Draft, id?: number) =>
+    id == null ? request<Task>('/todos', 'POST', data) : request<Task>('/todos/' + id, 'PUT', data),
+  remove: (id: number) => request<void>('/todos/' + id, 'DELETE'),
 }
 export function localDay(date = new Date()) {
   return [

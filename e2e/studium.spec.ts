@@ -1,6 +1,19 @@
 import { test, expect } from '@playwright/test'
 test('Studienaufgabe vom Anlegen bis zur bestätigten Löschung', async ({ page }) => {
   const testApi = 'http://localhost:18080/todos'
+  const email = process.env.E2E_EMAIL
+  const password = process.env.E2E_PASSWORD
+  if (!email || !password)
+    throw new Error('E2E_EMAIL und E2E_PASSWORD eines bestätigten Testaccounts fehlen.')
+  await page.goto('/')
+  await page.getByLabel('E-Mail-Adresse', { exact: true }).fill(email)
+  await page.getByLabel('Passwort', { exact: true }).fill(password)
+  await page.getByRole('button', { name: 'Anmelden', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Abmelden' })).toBeVisible()
+  const csrf = async () => {
+    const response = await page.request.get('http://localhost:18080/auth/csrf')
+    return { 'X-CSRF-TOKEN': (await response.json()).token }
+  }
   const examples = [
     { name: 'Lesetext annotieren', priority: 'mittel', dueDate: '2026-10-15', status: 'offen' },
     { name: 'Vorlesungsnotizen ordnen', priority: 'niedrig', dueDate: null, status: 'erledigt' },
@@ -11,10 +24,12 @@ test('Studienaufgabe vom Anlegen bis zur bestätigten Löschung', async ({ page 
       examples.some((e) => e.name === t.name) ||
       ['Lerngruppe vorbereiten', 'Lerngruppe vorbereiten · Kapitel 2'].includes(t.name),
   )) {
-    await page.request.delete(testApi + '/' + task.id)
+    await page.request.delete(testApi + '/' + task.id, { headers: await csrf() })
   }
   for (const example of examples)
-    expect((await page.request.post(testApi, { data: example })).status()).toBe(201)
+    expect(
+      (await page.request.post(testApi, { headers: await csrf(), data: example })).status(),
+    ).toBe(201)
   await page.goto('/')
   const shot = async (n: string) => {
     await page.screenshot({ path: 'docs/screenshots/' + n + '.png', fullPage: true })
@@ -70,5 +85,8 @@ test('Studienaufgabe vom Anlegen bis zur bestätigten Löschung', async ({ page 
     name: string
   }[]
   for (const task of remaining.filter((t) => examples.some((e) => e.name === t.name)))
-    await page.request.delete(testApi + '/' + task.id)
+    await page.request.delete(testApi + '/' + task.id, { headers: await csrf() })
+  await page.getByRole('button', { name: 'Abmelden' }).click()
+  await expect(page.getByRole('heading', { name: 'Anmelden' })).toBeVisible()
+  expect((await page.request.get(testApi)).status()).toBe(401)
 })

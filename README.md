@@ -1,34 +1,32 @@
 # Studienplaner
 
-Eine gemeinsame Aufgabenliste für Studierende. Die Anwendung zeigt echte Backend-Daten. Jede Person mit Zugriff kann Aufgaben bearbeiten und löschen. Für die öffentliche Demo ausschließlich unverfängliche Beispiele verwenden.
+Die Aufgabenliste gehört zum angemeldeten Account. Registrierung, E-Mail-Bestätigung per Button, erneuter Versand und Login sind direkt auf der Startseite erreichbar. Nach der Anmeldung kannst du den Anzeigenamen ändern, Aufgaben erstellen und bearbeiten, nach Titel oder Beschreibung suchen, filtern, sortieren oder dich abmelden.
 
-## Start und Vorführung
+## Lokaler Start
 
-1. Das Spring-Backend aus dem zweiten Repository mit einer separaten PostgreSQL-Entwicklungsdatenbank starten. Siehe dessen README für IntelliJ und die nur lokal erreichbare Testinstanz.
-2. Im Frontend-Ordner mit Node.js 26 und npm die Abhängigkeiten über npm ci installieren.
-3. npm run dev ausführen und http://localhost:5173 öffnen. .env.development zeigt auf Port 8080. VITE_BACKEND_BASE_URL kann in einer lokalen Entwicklungsdatei oder beim Build gesetzt werden.
-4. Eine erste Aufgabe anlegen. Die Demoanleitung führt durch alle sieben Use-Cases: [Bewertungsmatrix und Demonstration](docs/Abgabe.md).
+1. Das Spring-Backend mit PostgreSQL starten. Die Backend-README dokumentiert die Datenbankvariablen, das Entwicklungsprofil, FRONTEND_URL und den Resend-Absender.
+2. In diesem Verzeichnis mit Node 26 `npm ci` ausführen.
+3. Mit `npm run dev` starten und http://localhost:5173 öffnen. Im Entwicklungsmodus ist http://localhost:8080 die Standardadresse der API. Für andere Adressen VITE_BACKEND_BASE_URL setzen.
+4. Nach dem Registrieren die Mail öffnen und die Adresse per Button bestätigen. Anschließend mit E-Mail und Passwort anmelden. Neue Konten haben eine leere Liste.
 
-## Architektur
+## Aufbau
 
-TaskList hält die geladene Liste und die Ansichtsfilter. TaskEditor bearbeitet eine Kopie der Felder im nativen Dialog. Escape schließt den Dialog und der Fokus kehrt zum Auslöser zurück. tasks.ts kapselt HTTP, fachliche Typen, Filter und stabile Sortierung. Die Liste wird nach bestätigter Serverantwort aktualisiert. Während Laden oder Speichern ist kein zweiter schreibender Aufruf möglich. Ein Fehler beim Speichern erhält den Entwurf.
-
-Die Kennzahlen beziehen sich auf den ganzen Datenbestand. Die Trefferzahl beschreibt die gefilterte Ansicht. Vergleiche für Fälligkeit verwenden das Kalenderdatum des Browsers. Die Anwendung lädt die gemeinsame Liste vollständig. Sie ist für kleine Gruppen ausgelegt und synchronisiert Änderungen anderer Browser beim Neuladen.
+HomeView führt durch die Accountansichten. Der HTTP-Client in src/http.ts sendet das Sitzungscookie mit und holt vor jedem Schreibzugriff den CSRF-Wert aus dem Backend. TaskList verwaltet die persönlichen Aufgaben und Ansichtsfilter. TaskEditor bearbeitet eine Kopie der Felder in einem Dialog. Die Liste wird nach bestätigter Serverantwort aktualisiert. Die vorhandenen Task-Demonstrationen sind in [Abgabe.md](docs/Abgabe.md) beschrieben.
 
 ## Prüfungen
 
-    npm ci
-    npm run lint
-    npm run test:unit
-    npm run build
+```sh
+npm run lint
+npm run test:unit
+npm run build
+```
 
-Der Build enthält die TypeScript-Prüfung. Die Vitest-Tests prüfen Ansichtslogik und Vue-Komponenten. Der Browser-Test startet sein eigenes Frontend auf Port 15173. Er benötigt ein Backend auf Port 18080 mit FRONTEND_URL=http://localhost:15173 und einer ausschließlich für diesen Test gestarteten lokalen Datenbank. Er legt eindeutig benannte Studienbeispiele an und räumt sie nach dem Durchlauf auf.
+Alle drei Befehle wurden lokal erfolgreich ausgeführt. Die acht Vitest-Tests umfassen auch Versandfehler, erneuten Versand, unveränderte Unicode-Passwörter, CSRF, eingeschränkten Login, die bewusste Linkbestätigung, persönlichen Taskzugriff, Namensänderung und Logout mit simulierter API.
 
-    npx playwright install chromium
-    npm run test:e2e
+Für `npm run test:e2e` benötigt Playwright ein Backend auf Port 18080 mit aktivem dev-Profil, FRONTEND_URL=http://localhost:15173, eine isolierte Datenbank sowie E2E_EMAIL und E2E_PASSWORD eines bestätigten Testkontos. Der Test bearbeitet ausschließlich Aufgaben dieses Kontos. Mit `npx playwright install chromium` den Browser installieren. Die GitHub-Action checkt beide Projekte aus, führt die Backendtests aus und bereitet das Konto in ihrer eigenen PostgreSQL-Datenbank vor. BACKEND_REF muss auf die Backendversion mit Accountfunktion zeigen (Standard main). Ein privates Backend benötigt BACKEND_READ_TOKEN.
 
-Mit installiertem Google Chrome ist alternativ PW_CHANNEL=chrome npm run test:e2e möglich. Die CI-Action zeigt die vollständige Startreihenfolge. Sie installiert aus dem Lockfile, prüft das Frontend und führt anschließend den Browserablauf gegen echtes Spring und PostgreSQL aus. In GitHub BACKEND_REF möglichst auf einen kompatiblen Commit des Backend-Repos setzen. Standard ist der passende Backend-Commit a5c7f44. Bei privatem Backend-Repo muss BACKEND_READ_TOKEN lesenden Zugriff auf dieses Repo haben.
+Der lokale Aufruf von `npm run test:e2e` wurde beim Binden des Testserverports mit EPERM beendet. Ein erfolgreicher Lauf mit echtem Backend steht aus.
 
-## Render
+## Deployment
 
-Vor Veröffentlichung beim bestehenden Static-Site-Service Build-Befehl npm ci && npm run build und Publish Directory dist einstellen. Node 26 auswählen. VITE_BACKEND_BASE_URL muss beim Build auf die HTTPS-Adresse des Backend-Service zeigen. In Redirects/Rewrites die Regel /* → /index.html als Rewrite hinzufügen. Die Route /about leitet auf die Aufgabenübersicht um. In beiden Services den Deployment-Branch prüfen und „After CI Checks Pass“ aktivieren. Die Workflows wurden lokal vorbereitet. Ein GitHub-Lauf und der öffentliche Test dieser Version stehen aus. [Vue auf Render](https://render.com/docs/deploy-vue-js)
+Build-Befehl `npm ci && npm run build`, Ausgabeordner dist. VITE_BACKEND_BASE_URL beim Build auf die öffentliche HTTPS-Adresse setzen. Frontend und Backend brauchen für das Sitzungscookie eine gemeinsame Site oder einen Reverse Proxy auf derselben Origin. Bei gemeinsamem Origin /auth und /todos einschließlich Unterpfaden zuerst ans Backend weiterleiten, danach die Frontend-Routen auf /index.html umschreiben. FRONTEND_URL im Backend muss exakt der Frontend-Origin entsprechen. Der Resend-Schlüssel gehört ausschließlich in den Backend-Prozess.

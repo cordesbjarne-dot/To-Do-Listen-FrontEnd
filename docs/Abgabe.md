@@ -2,6 +2,8 @@
 
 Die Introfolien 16–19 der bereitgestellten Vorlesung nennen die Projektdemonstration, die öffentliche Render-App, über die Oberfläche gespeicherte Entitäten, Spring/Vue/Postgres, automatisierte Frontend- und Backend-Tests, vertrauliche Zugangsdaten und einen Screenshot pro Use-Case. Bewertungsdimensionen umfassen Funktionsumfang, CSS, dynamisches Frontend, Tests/Continuous Delivery und Backend-Struktur. Der Foliensatz bezeichnet das Projekt als 50 % der Modulnote. Die Termine im Foliensatz für das Sommersemester bitte mit den Angaben des aktuellen Kurses abgleichen.
 
+Die folgenden Screenshots und Prüfergebnisse dokumentieren die Task-Demo vor Einführung der Accounts. Für eine heutige Vorführung zuerst mit einem bestätigten Account anmelden. Die aktuellen Prüfstände stehen in den READMEs von Frontend und Backend.
+
 Die sieben folgenden Use-Cases sind unsere Produktentscheidung. Ihre Zählung wurde nicht durch den Dozenten bestätigt.
 
 | Vorgabe | Umsetzung und Datei | Prüfnachweis / Demohandlung |

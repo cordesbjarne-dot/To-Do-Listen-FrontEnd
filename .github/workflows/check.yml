@@ -23,7 +23,7 @@ jobs:
         with:
           persist-credentials: false
           repository: JonasGrdl/todo-list-backend
-          ref: ${{ vars.BACKEND_REF || 'a5c7f44c8f53fc4fd947dea88f51c9cffdd8e7be' }}
+          ref: ${{ vars.BACKEND_REF || 'main' }}
           path: test-backend
           token: ${{ secrets.BACKEND_READ_TOKEN || github.token }}
       - uses: actions/setup-java@v4
@@ -35,17 +35,36 @@ jobs:
           JDBC_DATABASE_USERNAME: studium
           JDBC_DATABASE_PASSWORD: ''
           PORT: '18080'
+          SPRING_PROFILES_ACTIVE: dev
           FRONTEND_URL: http://localhost:15173
         run: |
-          bash gradlew bootJar
+          bash gradlew test bootJar
           java -jar build/libs/*-SNAPSHOT.jar > "$RUNNER_TEMP/backend.log" 2>&1 &
           for attempt in {1..45}; do
-            if curl -fsS http://localhost:18080/todos; then exit 0; fi
+            if curl -fsS http://localhost:18080/auth/session; then exit 0; fi
             sleep 1
           done
           cat "$RUNNER_TEMP/backend.log"
           exit 1
       - run: npx playwright install --with-deps chromium
+      - name: Isolierten E2E-Account vorbereiten
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 55439
+          PGUSER: studium
+          PGDATABASE: postgres
+        run: |
+          export E2E_EMAIL=e2e@example.invalid
+          export E2E_PASSWORD="$(openssl rand -hex 24)"
+          echo "::add-mask::$E2E_PASSWORD"
+          csrf=$(curl -fsS -c "$RUNNER_TEMP/cookies" http://localhost:18080/auth/csrf | jq -r .token)
+          body=$(jq -n '{email: env.E2E_EMAIL, displayName: "Testkonto", password: env.E2E_PASSWORD}')
+          # Ohne Resend-Key bleibt der neue Account nach HTTP 503 unbestätigt.
+          status=$(curl -sS -o /dev/null -w '%{http_code}' -b "$RUNNER_TEMP/cookies" -H "X-CSRF-TOKEN: $csrf" -H 'Content-Type: application/json' -d "$body" http://localhost:18080/auth/register)
+          test "$status" = 503
+          psql -v ON_ERROR_STOP=1 -c "UPDATE todo_account SET verified = true WHERE email = 'e2e@example.invalid'"
+          echo "E2E_EMAIL=$E2E_EMAIL" >> "$GITHUB_ENV"
+          echo "E2E_PASSWORD=$E2E_PASSWORD" >> "$GITHUB_ENV"
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4
         if: always()

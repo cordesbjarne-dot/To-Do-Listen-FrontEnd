@@ -113,7 +113,7 @@ function dateText(s: string) {
     <header>
       <div>
         <h1>Studienplaner</h1>
-        <p>Die gemeinsame Aufgabenliste für dein Studium.</p>
+        <p>Deine persönlichen Aufgaben für das Studium.</p>
       </div>
       <button ref="newButton" class="primary" :disabled="busy || loading" @click="edit(null)">
         ＋ Neue Aufgabe
