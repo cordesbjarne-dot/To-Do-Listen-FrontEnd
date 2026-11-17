@@ -120,7 +120,7 @@ onUnmounted(() => {
       >
       <svg class="scene" :viewBox="camera" aria-hidden="true">
         <image :href="torso" x="543" y="220" width="980" height="1605" />
-        <rect x="-10000" y="700" width="20000" height="20000" fill="#f0f0f0" :opacity="fade" />
+        <rect x="-10000" y="-10000" width="20000" height="20000" fill="#f0f0f0" :opacity="fade" />
         <image
           :href="left"
           x="990"
