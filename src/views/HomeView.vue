@@ -15,7 +15,6 @@ import { ApiError, request } from '../http'
 type Page =
   'loading' | 'offline' | 'login' | 'register' | 'pending' | 'verify' | 'tasks' | 'profile'
 type Session = { state: 'authenticated' | 'anonymous' | 'pending'; displayName: string | null }
-const loginReady = ref(false)
 const intro = ref(true)
 const proof = initialProof
 initialProof = null
@@ -133,8 +132,8 @@ async function submit() {
     <TaskList />
   </template>
   <template v-else>
-  <ScrollIntro v-if="page === 'login' && intro" @ready="loginReady = $event" />
-  <main :inert="page === 'login' && intro && !loginReady" id="account-entry" class="account">
+  <component :is="page === 'login' && intro ? ScrollIntro : 'div'">
+  <main id="account-entry" class="account">
     <h1>
       {{
         {
@@ -208,6 +207,7 @@ async function submit() {
       </fieldset>
     </form>
   </main>
+  </component>
   </template>
 </template>
 

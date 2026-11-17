@@ -6,7 +6,7 @@ import right from '../assets/just-todo/right.png'
 import background from '../assets/just-todo/background.svg'
 import lettering from '../assets/just-todo/letter.svg'
 
-const emit = defineEmits<{ ready: [boolean] }>()
+const panel = ref<HTMLElement>()
 const section = ref<HTMLElement>()
 const stage = ref<HTMLElement>()
 const progress = ref(0)
@@ -38,17 +38,37 @@ function measure() {
   if (section.value && stage.value) {
     const distance = section.value.offsetHeight - stage.value.offsetHeight
     progress.value = reduced.value ? 1 : clamp(-section.value.getBoundingClientRect().top / Math.max(distance, 1))
-    emit("ready", progress.value >= .999)
+
   }
 }
 function schedule() { if (!frame) frame = requestAnimationFrame(measure) }
-async function skip() {
-  emit("ready", true)
-  await nextTick()
-  const form = document.getElementById('account-entry')
-  form?.scrollIntoView({block:'start'})
-  form?.querySelector('input')?.focus({preventScroll:true})
+const reveal = computed(() => ease((progress.value - .96) / .04))
+const ready = computed(() => progress.value >= .9999)
+let scrolling = 0
+function cancelScroll() {
+  cancelAnimationFrame(scrolling)
+  scrolling = 0
 }
+function skip() {
+  cancelScroll()
+  const start = scrollY
+  const began = performance.now()
+  function step(now: number) {
+    if (!section.value || !stage.value) return
+    const target = scrollY + section.value.getBoundingClientRect().top
+      + section.value.offsetHeight - stage.value.offsetHeight
+    const t = reduced.value ? 1 : clamp((now - began) / 850)
+    window.scrollTo({top: start + (target - start) * (t*t*(3-2*t)), behavior:'instant'})
+    if (t < 1) scrolling = requestAnimationFrame(step)
+    else {
+      scrolling = 0
+      measure()
+      void nextTick(() => panel.value?.querySelector('input')?.focus({preventScroll:true}))
+    }
+  }
+  scrolling = requestAnimationFrame(step)
+}
+const interruptions = ['wheel','touchstart','pointerdown','keydown','popstate','hashchange','pagehide']
 onMounted(() => {
   media = window.matchMedia?.('(prefers-reduced-motion: reduce)')
   media?.addEventListener('change', schedule)
@@ -56,9 +76,13 @@ onMounted(() => {
   if (section.value) observer?.observe(section.value)
   window.addEventListener('scroll', schedule, {passive:true})
   window.addEventListener('pageshow', schedule)
+  if (stage.value) observer?.observe(stage.value)
+  interruptions.forEach(event => window.addEventListener(event,cancelScroll,{passive:true}))
   measure()
 })
 onUnmounted(() => {
+  cancelScroll()
+  interruptions.forEach(event => window.removeEventListener(event,cancelScroll))
   observer?.disconnect()
   media?.removeEventListener('change', schedule)
   window.removeEventListener('scroll', schedule)
@@ -69,7 +93,7 @@ onUnmounted(() => {
 <template>
 <section ref="section" class="intro" aria-label="Just ToDo It">
   <div ref="stage" class="stage">
-    <a v-if="!reduced" href="#account-entry" class="skip" @click.prevent="skip">Direkt zum Login ↓</a>
+    <a v-if="!reduced && !ready" href="#account-entry" class="skip" @click.prevent="skip">Direkt zum Login ↓</a>
     <svg class="scene" :viewBox="camera" aria-hidden="true">
       <defs><clipPath id="shirt-crop"><rect x="214" y="241" width="461" height="941"/></clipPath></defs>
       <image :href="torso" x="-391" y="241" width="1671" height="941" clip-path="url(#shirt-crop)"/>
@@ -78,13 +102,25 @@ onUnmounted(() => {
       <image :href="background" x="25.897312" y="676" width="837.205" height="471" :opacity="fade"/>
       <image :href="lettering" x="292" y="670" width="315" height="229" :opacity="fade"/>
     </svg>
+    <div ref="panel" class="ending" :style="{opacity:reveal}" :inert="!ready" :aria-hidden="!ready">
+      <img class="wordmark" :src="lettering" alt="ToDo It">
+      <slot/>
+    </div>
   </div>
 </section>
 </template>
 <style scoped>
-.intro {height:275svh;background:#f0f0f0}
-.stage {height:100svh;position:sticky;top:0;display:grid;place-items:center;overflow:hidden}
-.scene {display:block;width:min(100%,177.78svh);height:auto;aspect-ratio:16/9;overflow:hidden}
+.intro {background:#f0f0f0;display:flow-root}
+.stage {position:sticky;top:0;display:grid;align-items:center;justify-items:center;min-height:100dvh}
+/* The trailing track belongs to the sticky containing block. */
+.intro::after {content:"";display:block;height:175svh}
+.scene,.ending {grid-area:1/1}
+.scene {display:block;width:min(100%,177.78svh);aspect-ratio:16/9;overflow:hidden}
+.ending {align-self:stretch;width:100%;display:flex;align-items:center;justify-content:center;gap:clamp(2rem,7vw,7rem);padding:2rem;background:#f0f0f0 url('../assets/just-todo/background.svg') center/100% 100% no-repeat}
+.ending[inert] {pointer-events:none}
+.wordmark {width:min(28vw,315px);height:auto}
+.ending :deep(.account) {margin:0;width:min(100%,26rem)}
 .skip {padding:.65rem 1rem;border-radius:2rem;text-decoration:none;position:absolute;right:clamp(1rem,4vw,3rem);top:1rem;z-index:1;background:#fff;color:#163c32}
-@media(prefers-reduced-motion:reduce){.intro,.stage{height:auto}.scene{width:min(100%,34rem)}}
+@media(max-width:700px){.ending{flex-direction:column;gap:.5rem;padding:1rem}.wordmark{width:7rem}}
+@media(prefers-reduced-motion:reduce){.intro::after{height:0}.scene{display:none}}
 </style>
