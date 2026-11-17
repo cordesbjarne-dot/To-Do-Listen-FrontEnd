@@ -8,12 +8,15 @@ if (initialProof !== null)
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import ScrollIntro from '../components/ScrollIntro.vue'
 import TaskList from '../components/TaskList.vue'
 import { ApiError, request } from '../http'
 
 type Page =
   'loading' | 'offline' | 'login' | 'register' | 'pending' | 'verify' | 'tasks' | 'profile'
 type Session = { state: 'authenticated' | 'anonymous' | 'pending'; displayName: string | null }
+const loginReady = ref(false)
+const intro = ref(true)
 const proof = initialProof
 initialProof = null
 const page = ref<Page>(proof !== null ? 'verify' : 'loading')
@@ -27,6 +30,7 @@ const info = ref('')
 const error = ref('')
 
 function go(next: Page, message = '') {
+  if (page.value !== 'loading' && page.value !== 'offline') intro.value = false
   page.value = next
   info.value = message
   error.value = ''
@@ -128,7 +132,9 @@ async function submit() {
     </div>
     <TaskList />
   </template>
-  <main v-else class="account">
+  <template v-else>
+  <ScrollIntro v-if="page === 'login' && intro" @ready="loginReady = $event" />
+  <main :inert="page === 'login' && intro && !loginReady" id="account-entry" class="account">
     <h1>
       {{
         {
@@ -202,6 +208,7 @@ async function submit() {
       </fieldset>
     </form>
   </main>
+  </template>
 </template>
 
 <style scoped>
