@@ -6,6 +6,9 @@ test('Studienaufgabe vom Anlegen bis zur bestätigten Löschung', async ({ page 
   if (!email || !password)
     throw new Error('E2E_EMAIL und E2E_PASSWORD eines bestätigten Testaccounts fehlen.')
   await page.goto('/')
+  // Das Formular wird erst am Ende der scrollgesteuerten Startanimation bedienbar.
+  await page.getByRole('link', { name: 'Direkt zum Login' }).click()
+  await expect(page.locator('.login-window')).not.toHaveAttribute('inert')
   await page.getByLabel('E-Mail-Adresse', { exact: true }).fill(email)
   await page.getByLabel('Passwort', { exact: true }).fill(password)
   await page.getByRole('button', { name: 'Anmelden', exact: true }).click()

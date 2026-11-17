@@ -67,5 +67,8 @@ jobs:
           echo "E2E_PASSWORD=$E2E_PASSWORD" >> "$GITHUB_ENV"
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4
+        if: failure()
+        with: {name: playwright-errors, path: test-results, retention-days: 7}
+      - uses: actions/upload-artifact@v4
         if: always()
         with: {name: use-case-screenshots, path: docs/screenshots}

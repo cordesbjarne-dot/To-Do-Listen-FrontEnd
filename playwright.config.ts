@@ -6,6 +6,9 @@ export default defineConfig({
     baseURL: 'http://localhost:15173',
     viewport: { width: 1280, height: 900 },
     channel: process.env.PW_CHANNEL || undefined,
+    reducedMotion: 'no-preference',
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
   },
   webServer: {
     command: 'npm run dev -- --port 15173 --strictPort',
